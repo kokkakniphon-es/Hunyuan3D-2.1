@@ -115,8 +115,8 @@ class Hunyuan3DPaintPipeline:
             output_mesh_path = os.path.join(path, f"textured_mesh.obj")
 
         # Load mesh
-        mesh = trimesh.load(processed_mesh_path)
-        mesh = mesh_uv_wrap(mesh)
+        mesh = trimesh.load(processed_mesh_path,force="mesh")
+        # mesh = mesh_uv_wrap(mesh)
         self.render.load_mesh(mesh=mesh)
 
         ########### View Selection #########
