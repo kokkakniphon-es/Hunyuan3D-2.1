@@ -260,7 +260,7 @@ def _apply_auto_smooth(auto_smooth_angle: float):
 def convert_obj_to_glb(
     obj_path: str,
     glb_path: str,
-    shade_type: str = "SMOOTH",
+    shade_type: str = "FLAT",
     auto_smooth_angle: float = 60,
     merge_vertices: bool = False,
 ) -> bool:

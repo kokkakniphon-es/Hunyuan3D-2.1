@@ -17,6 +17,8 @@ import torch
 import copy
 import trimesh
 import numpy as np
+import base64, io
+from pygltflib import GLTF2
 from PIL import Image
 from typing import List
 from DifferentiableRenderer.MeshRender import MeshRender
@@ -88,6 +90,52 @@ class Hunyuan3DPaintPipeline:
         self.models["super_model"] = imageSuperNet(self.config)
         self.models["multiview_model"] = multiviewDiffusionNet(self.config)
         print("Models Loaded.")
+    
+    # ──────────────────────────────────────────────────────────────────────
+    # helper – extract the first embedded normal-texture from a GLB/GLTF
+    # ──────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _extract_normal_texture(glb_path: str) -> Image.Image | None:
+        """
+        Returns a PIL Image if a normalTexture is present, else None.
+        Handles external URIs, embedded data-URIs and bufferViews.
+        """
+        gltf = GLTF2().load(glb_path)
+        if not gltf.materials:
+            return None
+
+        for mat in gltf.materials:
+            if mat.normalTexture is None:
+                continue
+
+            tex          = gltf.textures[mat.normalTexture.index]
+            img          = gltf.images[tex.source]
+
+            # 1) external image file on disk
+            if img.uri and not img.uri.startswith("data:"):
+                abs_path = os.path.join(os.path.dirname(glb_path), img.uri)
+                return Image.open(abs_path).convert("RGB")
+
+            # 2) data-URI
+            if img.uri and img.uri.startswith("data:"):
+                _, b64 = img.uri.split(",", 1)
+                return Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+
+            # 3) buffer-view (binary GLB)
+            if img.bufferView is not None:
+                bv   = gltf.bufferViews[img.bufferView]
+                buff = gltf.buffers[bv.buffer]
+                if buff.uri.startswith("data:"):
+                    bin_data = base64.b64decode(buff.uri.split(",")[1])
+                else:
+                    buff_path = os.path.join(os.path.dirname(glb_path), buff.uri)
+                    with open(buff_path, "rb") as f:
+                        bin_data = f.read()
+                start = bv.byteOffset or 0
+                end   = start + bv.byteLength
+                return Image.open(io.BytesIO(bin_data[start:end])).convert("RGB")
+
+        return None  # nothing found
 
     @torch.no_grad()
     def __call__(self, mesh_path=None, image_path=None, output_mesh_path=None, use_remesh=True, save_glb=True):
@@ -118,6 +166,20 @@ class Hunyuan3DPaintPipeline:
         mesh = trimesh.load(processed_mesh_path,force="mesh")
         # mesh = mesh_uv_wrap(mesh)
         self.render.load_mesh(mesh=mesh)
+
+        # ---------- load & apply the embedded normal map ---------- #
+        normal_texture = None
+        if mesh_path.lower().endswith((".glb", ".gltf")):
+            normal_texture = self._extract_normal_texture(mesh_path)
+
+        if normal_texture is not None:
+            normal_texture = normal_texture.resize(
+                (self.config.texture_size, self.config.texture_size)
+            )
+            self.render.set_texture_normal(normal_texture, force_set=True)
+            print("Embedded normal map applied.")
+        else:
+            print("No embedded normal map found – continuing without it.")
 
         ########### View Selection #########
         selected_camera_elevs, selected_camera_azims, selected_view_weights = self.view_processor.bake_view_selection(
@@ -186,7 +248,7 @@ class Hunyuan3DPaintPipeline:
         self.render.save_mesh(output_mesh_path, downsample=True)
 
         if save_glb:
-            convert_obj_to_glb(output_mesh_path, output_mesh_path.replace(".obj", ".glb"))
+            convert_obj_to_glb(output_mesh_path, output_mesh_path.replace(".obj", ".glb"), shade_type="FLAT")
             output_glb_path = output_mesh_path.replace(".obj", ".glb")
 
         return output_mesh_path
