@@ -173,10 +173,7 @@ class Hunyuan3DPaintPipeline:
             normal_texture = self._extract_normal_texture(mesh_path)
 
         if normal_texture is not None:
-            normal_texture = normal_texture.resize(
-                (self.config.texture_size, self.config.texture_size)
-            )
-            self.render.set_texture_normal(normal_texture, force_set=True)
+            self.render.set_texture_normal(torch.from_numpy(np.array(normal_texture) / 255.0).float(), force_set=True)
             print("Embedded normal map applied.")
         else:
             print("No embedded normal map found – continuing without it.")
@@ -245,7 +242,7 @@ class Hunyuan3DPaintPipeline:
             texture_mr = self.view_processor.texture_inpaint(texture_mr, mask_mr_np)
             self.render.set_texture_mr(texture_mr)
 
-        self.render.save_mesh(output_mesh_path, downsample=True)
+        self.render.save_mesh_with_fullnormal(output_mesh_path, downsample=True)
 
         if save_glb:
             convert_obj_to_glb(output_mesh_path, output_mesh_path.replace(".obj", ".glb"), shade_type="FLAT")

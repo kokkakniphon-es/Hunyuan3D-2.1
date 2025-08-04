@@ -622,6 +622,42 @@ class MeshRender:
         if texture_data is not None:
             self.set_texture(texture_data)
 
+    def save_mesh_with_fullnormal(self, mesh_path, downsample=False):
+        """
+        Save current mesh with textures to file.
+        
+        Args:
+            mesh_path: Output file path
+            downsample: Whether to downsample textures by half
+        """
+
+        vtx_pos, pos_idx, vtx_uv, uv_idx = self.get_mesh(normalize=False)
+        texture_data = self.get_texture()
+        texture_metallic, texture_roughness = self.get_texture_mr()
+        texture_normal = self.get_texture_normal()
+        if downsample:
+            texture_data = cv2.resize(texture_data, (texture_data.shape[1] // 2, texture_data.shape[0] // 2))
+            if texture_metallic is not None:
+                texture_metallic = cv2.resize(
+                    texture_metallic, (texture_metallic.shape[1] // 2, texture_metallic.shape[0] // 2)
+                )
+            if texture_roughness is not None:
+                texture_roughness = cv2.resize(
+                    texture_roughness, (texture_roughness.shape[1] // 2, texture_roughness.shape[0] // 2)
+                )
+
+        save_mesh(
+            mesh_path,
+            vtx_pos,
+            pos_idx,
+            vtx_uv,
+            uv_idx,
+            texture_data,
+            metallic=texture_metallic,
+            roughness=texture_roughness,
+            normal=texture_normal,
+        )
+
     def save_mesh(self, mesh_path, downsample=False):
         """
         Save current mesh with textures to file.

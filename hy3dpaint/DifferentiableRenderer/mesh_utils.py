@@ -69,7 +69,7 @@ def _save_texture_map(
     texture: np.ndarray,
     base_path: str,
     suffix: str = "",
-    image_format: str = ".jpg",
+    image_format: str = ".png",
     color_convert: Optional[int] = None,
 ) -> str:
     """Save texture map with optional color conversion."""
