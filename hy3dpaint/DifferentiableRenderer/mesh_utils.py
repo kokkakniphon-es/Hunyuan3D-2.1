@@ -257,6 +257,31 @@ def _apply_auto_smooth(auto_smooth_angle: float):
         bpy.ops.object.shade_auto_smooth(angle=angle_rad)
 
 
+def _calculate_tangents():
+    """Calculate tangents for all selected mesh objects."""
+    for obj in bpy.context.selected_objects:
+        if obj.type == "MESH" and obj.data.uv_layers:
+            # Set object as active
+            bpy.context.view_layer.objects.active = obj
+            
+            # Enter edit mode to calculate tangents
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            
+            # Calculate tangents if UV coordinates exist
+            if obj.data.uv_layers.active:
+                # Ensure normals are calculated first
+                bpy.ops.mesh.normals_make_consistent(inside=False)
+                
+                # Switch back to object mode
+                bpy.ops.object.mode_set(mode="OBJECT")
+                
+                # Calculate tangents using the mesh data
+                obj.data.calc_tangents()
+            else:
+                bpy.ops.object.mode_set(mode="OBJECT")
+
+
 def convert_obj_to_glb(
     obj_path: str,
     glb_path: str,
@@ -276,6 +301,9 @@ def convert_obj_to_glb(
         # Process meshes
         _merge_vertices_if_needed(merge_vertices)
         _apply_shading(shade_type, auto_smooth_angle)
+        
+        # Calculate tangents for proper normal mapping support
+        _calculate_tangents()
 
         # Export to GLB
         bpy.ops.export_scene.gltf(filepath=glb_path, use_active_scene=True)
